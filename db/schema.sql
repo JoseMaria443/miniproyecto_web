@@ -45,8 +45,7 @@ CREATE TABLE Inscripciones {
     id SERIAL PRIMARY KEY,
     estudiante_id INTEGER NOT NULL REFERENCES Estudiantes(id) ON DELETE CASCADE,
     grupo_id INTEGER NOT NULL REFERENCES Grupos(id) ON DELETE CASCADE,
-    fecha_inscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    UNIQUE(estudiante_id, grupo_id)
+    fecha_inscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP UNIQUE(estudiante_id, grupo_id)
 }
 
 --Calificaciones
