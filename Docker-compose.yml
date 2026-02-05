@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: nextjs_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
+      - ./db/migrate.sql:/docker-entrypoint-initdb.d/3-migrate.sql
+      - ./db/view1_ventas.sql:/docker-entrypoint-initdb.d/4-view1.sql
+      - ./db/view2_estatus_inventario.sql:/docker-entrypoint-initdb.d/5-view2.sql
+      - ./db/view3_clientes_ricos.sql:/docker-entrypoint-initdb.d/6-view3.sql
+      - ./db/view4_masVendidos.sql:/docker-entrypoint-initdb.d/7-view4.sql
+      - ./db/view5_mas_complejas.sql:/docker-entrypoint-initdb.d/8-view5.sql
+      - ./db/indexes.sql:/docker-entrypoint-initdb.d/9-indexes.sql
+      - ./db/roles.sql:/docker-entrypoint-initdb.d/99-roles.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: nextjs_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://chema:Chema3001@db:5432/postgres
+    depends_on:
+      db:
+        condition: service_healthy
