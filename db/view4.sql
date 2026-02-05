@@ -17,3 +17,6 @@ JOIN Cursos c ON g.curso_id = c.id
 LEFT JOIN Inscripciones i ON g.id = i.grupo_id
 LEFT JOIN Asistencias a ON i.id = a.inscripcion_id
 GROUP BY g.id, c.nombre, g.periodo;
+
+
+-- Confirmacion View 4
