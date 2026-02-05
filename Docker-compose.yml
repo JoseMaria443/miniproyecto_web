@@ -13,11 +13,11 @@ services:
       - ./db/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
       - ./db/seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
       - ./db/migrate.sql:/docker-entrypoint-initdb.d/3-migrate.sql
-      - ./db/view1_ventas.sql:/docker-entrypoint-initdb.d/4-view1.sql
-      - ./db/view2_estatus_inventario.sql:/docker-entrypoint-initdb.d/5-view2.sql
-      - ./db/view3_clientes_ricos.sql:/docker-entrypoint-initdb.d/6-view3.sql
-      - ./db/view4_masVendidos.sql:/docker-entrypoint-initdb.d/7-view4.sql
-      - ./db/view5_mas_complejas.sql:/docker-entrypoint-initdb.d/8-view5.sql
+      - ./db/view1.sql:/docker-entrypoint-initdb.d/4-view1.sql
+      - ./db/view2.sql:/docker-entrypoint-initdb.d/5-view2.sql
+      - ./db/view3.sql:/docker-entrypoint-initdb.d/6-view3.sql
+      - ./db/view4.sql:/docker-entrypoint-initdb.d/7-view4.sql
+      - ./db/view5.sql:/docker-entrypoint-initdb.d/8-view5.sql
       - ./db/indexes.sql:/docker-entrypoint-initdb.d/9-indexes.sql
       - ./db/roles.sql:/docker-entrypoint-initdb.d/99-roles.sql
     healthcheck:
