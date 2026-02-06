@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { query } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const toNumber = (value: string | undefined, fallback: number) => {
 	const n = Number(value);
 	return Number.isFinite(n) && n > 0 ? n : fallback;

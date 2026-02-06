@@ -1,6 +1,8 @@
 import { query } from "@/lib/db";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const FilterSchema = z.object({
   term: z.string().optional(),
 });
