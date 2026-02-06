@@ -9,24 +9,29 @@ export default async function TeacherLoadReport({
 }: {
 	searchParams: { [key: string]: string | string[] | undefined };
 }) {
-	const rawTerm = getParam(searchParams.term).trim();
+	// Extraer parámetros
+	const term = getParam(searchParams.term).trim() || undefined;
+	const validTerm = (term && term.length > 0) ? term : undefined;
+	
 	const rawPage = getParam(searchParams.page);
 	const rawPageSize = getParam(searchParams.pageSize);
 
 	const page = toNumber(rawPage, 1);
 	const pageSize = Math.min(toNumber(rawPageSize, 10), 50);
 
+	// Construir filtros
 	const filters: string[] = [];
 	const values: Array<string | number> = [];
 
-	if (rawTerm) {
-		values.push(rawTerm);
-		filters.push(`UPPER(term) = UPPER($${values.length})`);
+	if (validTerm) {
+		values.push(validTerm);
+		filters.push(`term = $${values.length}`);
 	}
 
 	const where = buildWhereClause(filters, values);
 	const offset = (page - 1) * pageSize;
 
+	// Query para contar total
 	const countRes = await query(
 		`SELECT COUNT(*)::int AS total FROM vw_teacher_load ${where}`,
 		values
@@ -34,6 +39,7 @@ export default async function TeacherLoadReport({
 	const total = countRes.rows[0]?.total ?? 0;
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+	// Query para obtener datos paginados
 	const dataRes = await query(
 		`SELECT * FROM vw_teacher_load ${where} ORDER BY term DESC, total_grupos DESC LIMIT $${
 			values.length + 1
@@ -42,8 +48,16 @@ export default async function TeacherLoadReport({
 	);
 	const data = dataRes.rows;
 
+	// Debug
+	console.log("===== TEACHER LOAD FILTRO DEBUG =====");
+	console.log("validTerm:", validTerm);
+	console.log("filters:", filters);
+	console.log("values:", values);
+	console.log("Total rows:", total);
+	console.log("======================================");
+
 	const makeLink = (targetPage: number) =>
-		createPaginationLink({ term: rawTerm }, targetPage, pageSize);
+		createPaginationLink({ term: validTerm || "" }, targetPage, pageSize);
 
 	return (
 		<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -73,71 +87,81 @@ export default async function TeacherLoadReport({
 						</button>
 					</form>
 
-					<div className="bg-white shadow rounded-lg overflow-hidden">
-						<table className="min-w-full divide-y divide-gray-200">
-							<thead className="bg-gray-50">
-								<tr>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Docente
-									</th>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Periodo
-									</th>
-									<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-										Grupos
-									</th>
-									<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-										Alumnos
-									</th>
-									<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-										Promedio
-									</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-gray-200">
-								{data.map((row: any) => (
-									<tr key={`${row.maestro_id}-${row.term}`}>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="font-medium text-gray-900">{row.maestro_nombre}</div>
-											<div className="text-xs text-gray-500">{row.maestro_correo}</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">{row.term}</td>
-										<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-											{row.total_grupos}
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-											{row.total_estudiantes}
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-											{row.promedio_calificaciones}
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-
-					<div className="flex items-center justify-between mt-6 text-sm">
-						<span className="text-gray-600">
-							Pagina {page} de {totalPages} ({total} registros)
-						</span>
-						<div className="flex gap-3">
-							{page > 1 ? (
-								<Link className="text-blue-600" href={makeLink(page - 1)}>
-									Anterior
-								</Link>
-							) : (
-								<span className="text-gray-400">Anterior</span>
-							)}
-							{page < totalPages ? (
-								<Link className="text-blue-600" href={makeLink(page + 1)}>
-									Siguiente
-								</Link>
-							) : (
-								<span className="text-gray-400">Siguiente</span>
-							)}
+					{data.length === 0 ? (
+						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+							<p className="text-yellow-700 font-bold text-sm">
+								No hay datos para el período {rawTerm && `"${rawTerm}"`}. Intenta con 2024-A o 2024-B
+							</p>
 						</div>
-					</div>
+					) : (
+						<>
+							<div className="bg-white shadow rounded-lg overflow-hidden">
+								<table className="min-w-full divide-y divide-gray-200">
+									<thead className="bg-gray-50">
+										<tr>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+												Docente
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+												Periodo
+											</th>
+											<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+												Grupos
+											</th>
+											<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+												Alumnos
+											</th>
+											<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+												Promedio
+											</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-gray-200">
+										{data.map((row: any) => (
+											<tr key={`${row.maestro_id}-${row.term}`}>
+												<td className="px-6 py-4 whitespace-nowrap">
+													<div className="font-medium text-gray-900">{row.maestro_nombre}</div>
+													<div className="text-xs text-gray-500">{row.maestro_correo}</div>
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap">{row.term}</td>
+												<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
+													{row.total_grupos}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
+													{row.total_estudiantes}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
+													{row.promedio_calificaciones}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+
+							<div className="flex items-center justify-between mt-6 text-sm">
+								<span className="text-gray-600">
+									Pagina {page} de {totalPages} ({total} registros)
+								</span>
+								<div className="flex gap-3">
+									{page > 1 ? (
+										<Link className="text-blue-600" href={makeLink(page - 1)}>
+											Anterior
+										</Link>
+									) : (
+										<span className="text-gray-400">Anterior</span>
+									)}
+									{page < totalPages ? (
+										<Link className="text-blue-600" href={makeLink(page + 1)}>
+											Siguiente
+										</Link>
+									) : (
+										<span className="text-gray-400">Siguiente</span>
+									)}
+								</div>
+							</div>
+						</>
+					)}
 				</div>
 			</div>
 		</main>

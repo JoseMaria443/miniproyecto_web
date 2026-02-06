@@ -1,37 +1,57 @@
 import { query } from "@/lib/db";
-import { z } from "zod";
 import { getParam, buildWhereClause } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
-
-const FilterSchema = z.object({
-  term: z.string().optional(),
-});
 
 export default async function AttendanceReport({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  const rawTerm = getParam(searchParams.term).trim();
-  const parsed = FilterSchema.safeParse({ term: rawTerm || undefined });
-  const term = parsed.success ? parsed.data.term : undefined;
+  // Extraer el término de búsqueda de forma simple
+  const term = getParam(searchParams.term).trim() || undefined;
+  
+  // Si hay un término, asegurarse de que sea válido (no vacío)
+  const validTerm = (term && term.length > 0) ? term : undefined;
 
+  // Construir filtros
   const filters: string[] = [];
   const values: Array<string | number> = [];
 
-  if (term) {
-    values.push(term);
-    filters.push(`UPPER(term) = UPPER($${values.length})`);
+  if (validTerm) {
+    values.push(validTerm);
+    filters.push(`term = $${values.length}`); // Usar comparación directa, no UPPER
   }
 
   const where = buildWhereClause(filters, values);
 
-  const res = await query(
-    `SELECT * FROM vw_attendance_by_group ${where} ORDER BY porcentaje_asistencia ASC`,
-    values
-  );
+  // Construir SQL completo
+  const sql = `SELECT * FROM vw_attendance_by_group ${where} ORDER BY porcentaje_asistencia ASC`;
+  
+  // DEBUG - registrar lo que se está ejecutando
+  console.log("===== FILTRO DEBUG =====");
+  console.log("searchParams:", searchParams);
+  console.log("term extraído:", term);
+  console.log("validTerm:", validTerm);
+  console.log("filters array:", filters);
+  console.log("values array:", values);
+  console.log("WHERE clause:", where);
+  console.log("SQL final:", sql);
+  console.log("=======================");
+
+  // Ejecutar query con parámetros
+  const res = await query(sql, values);
   const data = res.rows;
+
+  console.log(`Query ejecutada. Filas retornadas: ${data.length}`);
+  if (data.length > 0) {
+    console.log("Primero fila (sample):", {
+      grupo_id: data[0].grupo_id,
+      curso_nombre: data[0].curso_nombre,
+      term: data[0].term,
+      porcentaje_asistencia: data[0].porcentaje_asistencia,
+    });
+  }
 
   const criticalGroup = data[0];
 
@@ -51,7 +71,7 @@ export default async function AttendanceReport({
             <input
               name="term"
               placeholder="Periodo (ej. 2024-A)"
-              defaultValue={rawTerm}
+              defaultValue={term || ""}
               className="border border-gray-300 rounded px-3 py-2 text-sm"
             />
             <button
@@ -73,44 +93,54 @@ export default async function AttendanceReport({
             </div>
           )}
 
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Curso
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Periodo
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                    % Asistencia
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {data.map((row: any) => (
-                  <tr key={row.grupo_id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {row.curso_nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">{row.term}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-                      <span
-                        className={
-                          row.porcentaje_asistencia < 80
-                            ? "text-red-600 font-bold"
-                            : ""
-                        }
-                      >
-                        {row.porcentaje_asistencia}%
-                      </span>
-                    </td>
+          {data.length === 0 ? (
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+              <p className="text-yellow-700 font-bold text-sm">
+                {validTerm 
+                  ? `No hay datos para el período: "${validTerm}". Intenta con 2024-A o 2024-B` 
+                  : "Sin filtro aplicado. Ingresa un período para ver datos (ej: 2024-A)"}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Curso
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Periodo
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      % Asistencia
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {data.map((row: any) => (
+                    <tr key={row.grupo_id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {row.curso_nombre}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{row.term}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right font-mono">
+                        <span
+                          className={
+                            row.porcentaje_asistencia < 80
+                              ? "text-red-600 font-bold"
+                              : ""
+                          }
+                        >
+                          {row.porcentaje_asistencia}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </main>

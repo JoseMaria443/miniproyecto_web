@@ -118,69 +118,79 @@ export default async function RankStudentsReport({
 						</button>
 					</form>
 
-					<div className="bg-white shadow rounded-lg overflow-hidden">
-						<table className="min-w-full divide-y divide-gray-200">
-							<thead className="bg-gray-50">
-								<tr>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Estudiante
-									</th>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Programa
-									</th>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Periodo
-									</th>
-									<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-										Promedio
-									</th>
-									<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-										Ranking
-									</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-gray-200">
-								{data.map((row: any) => (
-									<tr key={`${row.estudiante_id}-${row.term}-${row.programa}`}>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="font-medium text-gray-900">{row.estudiante_nombre}</div>
-											<div className="text-xs text-gray-500">{row.estudiante_correo}</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">{row.programa}</td>
-										<td className="px-6 py-4 whitespace-nowrap">{row.term}</td>
-										<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-											{row.promedio_calificaciones}
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
-											#{row.posicion_en_ranking}
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-
-					<div className="flex items-center justify-between mt-6 text-sm">
-						<span className="text-gray-600">
-							Pagina {page} de {totalPages} ({total} registros)
-						</span>
-						<div className="flex gap-3">
-							{page > 1 ? (
-								<Link className="text-blue-600" href={makeLink(page - 1)}>
-									Anterior
-								</Link>
-							) : (
-								<span className="text-gray-400">Anterior</span>
-							)}
-							{page < totalPages ? (
-								<Link className="text-blue-600" href={makeLink(page + 1)}>
-									Siguiente
-								</Link>
-							) : (
-								<span className="text-gray-400">Siguiente</span>
-							)}
+					{data.length === 0 ? (
+						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+							<p className="text-yellow-700 font-bold text-sm">
+								No hay datos {term && `para el período "${term}"`} {program && `en el programa "${program}"`}. Intenta con 2024-A o 2024-B
+							</p>
 						</div>
-					</div>
+					) : (
+						<>
+							<div className="bg-white shadow rounded-lg overflow-hidden">
+								<table className="min-w-full divide-y divide-gray-200">
+									<thead className="bg-gray-50">
+										<tr>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+												Estudiante
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+												Programa
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+												Periodo
+											</th>
+											<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+												Promedio
+											</th>
+											<th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+												Ranking
+											</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-gray-200">
+										{data.map((row: any) => (
+											<tr key={`${row.estudiante_id}-${row.term}-${row.programa}`}>
+												<td className="px-6 py-4 whitespace-nowrap">
+													<div className="font-medium text-gray-900">{row.estudiante_nombre}</div>
+													<div className="text-xs text-gray-500">{row.estudiante_correo}</div>
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap">{row.programa}</td>
+												<td className="px-6 py-4 whitespace-nowrap">{row.term}</td>
+												<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
+													{row.promedio_calificaciones}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-right font-mono">
+													#{row.posicion_en_ranking}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+
+							<div className="flex items-center justify-between mt-6 text-sm">
+								<span className="text-gray-600">
+									Pagina {page} de {totalPages} ({total} registros)
+								</span>
+								<div className="flex gap-3">
+									{page > 1 ? (
+										<Link className="text-blue-600" href={makeLink(page - 1)}>
+											Anterior
+										</Link>
+									) : (
+										<span className="text-gray-400">Anterior</span>
+									)}
+									{page < totalPages ? (
+										<Link className="text-blue-600" href={makeLink(page + 1)}>
+											Siguiente
+										</Link>
+									) : (
+										<span className="text-gray-400">Siguiente</span>
+									)}
+								</div>
+							</div>
+						</>
+					)}
 				</div>
 			</div>
 		</main>
