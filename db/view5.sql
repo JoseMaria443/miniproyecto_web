@@ -1,6 +1,10 @@
--- vw_rank_students
--- Grain: 1 row per student + program + term
-
+-- VIEW: vw_rank_students
+-- Returns: Student ranking by average grade per term.
+-- Grain: 1 row per student + program + term.
+-- Metrics: promedio_calificaciones, posicion_en_ranking, nivel_desempeno.
+-- Verify:
+--   SELECT * FROM vw_rank_students WHERE term = '2024-A' LIMIT 10;
+--   SELECT term, COUNT(*) AS total_ranked FROM vw_rank_students GROUP BY term;
 CREATE OR REPLACE VIEW vw_rank_students AS
 WITH StudentCalificaciones AS (
     SELECT

@@ -1,5 +1,10 @@
--- vw_students_at_risk
--- Grain: 1 row per student + term
+-- VIEW: vw_students_at_risk
+-- Returns: Students at risk per term.
+-- Grain: 1 row per student + term.
+-- Metrics: promedio_acumulado, porcentaje_inasistencia, riesgo_motivo.
+-- Verify:
+--   SELECT * FROM vw_students_at_risk WHERE term = '2024-A' LIMIT 10;
+--   SELECT term, COUNT(*) AS total_riesgo FROM vw_students_at_risk GROUP BY term;
 
 CREATE OR REPLACE VIEW vw_students_at_risk AS
 WITH StudentAtRisk AS (

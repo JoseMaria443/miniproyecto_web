@@ -1,6 +1,10 @@
--- vw_course_performance
--- Grain: 1 row per course + term
-
+-- VIEW: vw_course_performance
+-- Returns: Course performance per term.
+-- Grain: 1 row per course + term.
+-- Metrics: promedio_calificaciones, total_reprobados, tasa_reprobacion.
+-- Verify:
+--   SELECT * FROM vw_course_performance WHERE term = '2024-A' ORDER BY tasa_reprobacion DESC;
+--   SELECT term, AVG(promedio_calificaciones) AS avg_curso FROM vw_course_performance GROUP BY term;
 CREATE OR REPLACE VIEW vw_course_performance AS
 WITH CursoCalificaciones AS (
     SELECT
@@ -39,4 +43,5 @@ SELECT
         0
     ) AS tasa_reprobacion
 FROM CursoCalificaciones
-GROUP BY curso_id, curso_codigo, curso_nombre, term;
+GROUP BY curso_id, curso_codigo, curso_nombre, term
+HAVING COUNT(DISTINCT inscripcion_id) > 0;
