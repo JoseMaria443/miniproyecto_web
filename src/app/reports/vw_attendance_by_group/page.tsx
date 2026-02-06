@@ -7,7 +7,7 @@ const FilterSchema = z.object({
 });
 
 export default async function AttendanceReport({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const { term } = FilterSchema.parse(searchParams);
+  const { term } = await FilterSchema.parse(searchParams);
 
   const query = term 
     ? { text: "SELECT * FROM vw_attendance_by_group WHERE term = $1", values: [term] }
