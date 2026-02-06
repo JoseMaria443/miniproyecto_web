@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { z } from "zod";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -8,15 +9,26 @@ const toNumber = (value: string | undefined, fallback: number) => {
 	return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
+const FilterSchema = z.object({
+	term: z.string().optional(),
+	q: z.string().optional(),
+	page: z.string().optional(),
+	pageSize: z.string().optional(),
+});
+
 export default async function StudentsAtRiskReport({
 	searchParams,
 }: {
 	searchParams: { [key: string]: string | undefined };
 }) {
-	const term = searchParams.term?.trim() || "";
-	const q = searchParams.q?.trim() || "";
-	const page = toNumber(searchParams.page, 1);
-	const pageSize = Math.min(toNumber(searchParams.pageSize, 10), 50);
+	const parsed = FilterSchema.safeParse(searchParams);
+	const term = parsed.success ? parsed.data.term ?? "" : "";
+	const q = parsed.success ? parsed.data.q ?? "" : "";
+	const page = toNumber(parsed.success ? parsed.data.page : undefined, 1);
+	const pageSize = Math.min(
+		toNumber(parsed.success ? parsed.data.pageSize : undefined, 10),
+		50
+	);
 	const offset = (page - 1) * pageSize;
 
 	const filters: string[] = [];

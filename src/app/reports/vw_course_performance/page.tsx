@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { z } from "zod";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -8,38 +9,44 @@ const toNumber = (value: string | undefined, fallback: number) => {
 	return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
+const ProgramWhitelist = [
+	"Ingenieria de Software",
+	"Ciencias de Datos",
+	"Diseno Digital",
+	"Historia del Arte",
+] as const;
+
+const FilterSchema = z.object({
+	term: z.string().min(1, "Term es obligatorio"),
+	program: z.enum(ProgramWhitelist).optional(),
+	page: z.string().optional(),
+	pageSize: z.string().optional(),
+});
+
 export default async function CoursePerformanceReport({
 	searchParams,
 }: {
 	searchParams: { [key: string]: string | undefined };
 }) {
-	const term = searchParams.term?.trim() || "";
-	const program = searchParams.program?.trim() || "";
-	const page = toNumber(searchParams.page, 1);
-	const pageSize = Math.min(toNumber(searchParams.pageSize, 10), 50);
+	const parsed = FilterSchema.safeParse(searchParams);
+	const term = parsed.success ? parsed.data.term : "";
+	const program = parsed.success ? parsed.data.program ?? "" : "";
+	const page = toNumber(parsed.success ? parsed.data.page : undefined, 1);
+	const pageSize = Math.min(
+		toNumber(parsed.success ? parsed.data.pageSize : undefined, 10),
+		50
+	);
 	const offset = (page - 1) * pageSize;
 
 	const filters: string[] = [];
 	const values: Array<string | number> = [];
 
-	if (term) {
-		values.push(term);
-		filters.push(`v.term = $${values.length}`);
-	}
+	values.push(term);
+	filters.push(`v.term = $${values.length}`);
 
 	if (program) {
 		values.push(program);
-		filters.push(
-			`EXISTS (
-				SELECT 1
-				FROM Inscripciones i
-				JOIN Grupos g2 ON i.grupo_id = g2.id
-				JOIN Estudiantes e ON i.estudiante_id = e.id
-				WHERE g2.curso_id = v.curso_id
-					AND g2.periodo = v.term
-					AND e.programa = $${values.length}
-			)`
-		);
+		filters.push(`$${values.length} = ANY (v.programas)`);
 	}
 
 	const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
@@ -82,12 +89,18 @@ export default async function CoursePerformanceReport({
 					defaultValue={term}
 					className="border border-gray-300 rounded px-3 py-2 text-sm"
 				/>
-				<input
+				<select
 					name="program"
-					placeholder="Programa (opcional)"
 					defaultValue={program}
 					className="border border-gray-300 rounded px-3 py-2 text-sm"
-				/>
+				>
+					<option value="">Programa (opcional)</option>
+					{ProgramWhitelist.map((item) => (
+						<option key={item} value={item}>
+							{item}
+						</option>
+					))}
+				</select>
 				<input type="hidden" name="pageSize" value={pageSize} />
 				<button
 					type="submit"

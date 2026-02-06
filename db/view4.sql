@@ -14,6 +14,7 @@ WITH CursoCalificaciones AS (
         g.periodo AS term,
         g.id AS grupo_id,
         i.id AS inscripcion_id,
+        e.programa AS estudiante_programa,
         COALESCE(
             cal.calificacion,
             (cal.parcial1 + cal.parcial2 + cal.final) / 3.0
@@ -21,6 +22,7 @@ WITH CursoCalificaciones AS (
     FROM Cursos c
     JOIN Grupos g ON g.curso_id = c.id
     LEFT JOIN Inscripciones i ON g.id = i.grupo_id
+    LEFT JOIN Estudiantes e ON i.estudiante_id = e.id
     LEFT JOIN Calificaciones cal ON i.id = cal.inscripcion_id
 )
 SELECT
@@ -28,6 +30,7 @@ SELECT
     curso_codigo,
     curso_nombre,
     term,
+    ARRAY_REMOVE(ARRAY_AGG(DISTINCT estudiante_programa), NULL) AS programas,
     COUNT(DISTINCT grupo_id) AS total_grupos,
     COUNT(DISTINCT inscripcion_id) AS total_inscripciones,
     ROUND(AVG(calificacion_final), 2) AS promedio_calificaciones,

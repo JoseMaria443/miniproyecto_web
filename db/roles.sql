@@ -1,26 +1,26 @@
 -- =====================================================================
--- ROLES Y PERSIMOs
+-- ROLES Y PERMISOS
 -- =====================================================================
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'chema') THEN
-        CREATE ROLE web_user LOGIN PASSWORD 'chema3001';
+        CREATE ROLE chema LOGIN PASSWORD 'chema3001';
     END IF;
-END
+END $$;
 
---persimos de conexion
-GRANT CONNECT ON DATABASE miniproyecto_web TO chema;
+-- permisos de conexion
+GRANT CONNECT ON DATABASE postgres TO chema;
 GRANT USAGE ON SCHEMA public TO chema;
 
---solo puede leer las tablas
+-- solo puede leer las tablas
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM chema;
-GRANT SELECT ON Estudiante TO chema;
-GRANT SELECT ON Maestros TO chema;
-GRANT SELECT ON Cursos TO chema;
-GRANT SELECT ON Grupos TO chema;
-GRANT SELECT ON Inscripciones TO chema;
-GRANT SELECT ON Calificaciones TO chema;
-GRANT SELECT ON Asistencia TO chema;
+GRANT SELECT ON TABLE Estudiantes TO chema;
+GRANT SELECT ON TABLE Maestros TO chema;
+GRANT SELECT ON TABLE Cursos TO chema;
+GRANT SELECT ON TABLE Grupos TO chema;
+GRANT SELECT ON TABLE Inscripciones TO chema;
+GRANT SELECT ON TABLE Calificaciones TO chema;
+GRANT SELECT ON TABLE Asistencia TO chema;
 
 
