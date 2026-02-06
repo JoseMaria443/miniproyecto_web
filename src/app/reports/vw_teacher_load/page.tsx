@@ -1,32 +1,31 @@
 import Link from "next/link";
 import { query } from "@/lib/db";
+import { toNumber, getParam, buildWhereClause, createPaginationLink } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
-
-const toNumber = (value: string | undefined, fallback: number) => {
-	const n = Number(value);
-	return Number.isFinite(n) && n > 0 ? n : fallback;
-};
 
 export default async function TeacherLoadReport({
 	searchParams,
 }: {
-	searchParams: { [key: string]: string | undefined };
+	searchParams: { [key: string]: string | string[] | undefined };
 }) {
-	const term = searchParams.term?.trim() || "";
-	const page = toNumber(searchParams.page, 1);
-	const pageSize = Math.min(toNumber(searchParams.pageSize, 10), 50);
-	const offset = (page - 1) * pageSize;
+	const rawTerm = getParam(searchParams.term).trim();
+	const rawPage = getParam(searchParams.page);
+	const rawPageSize = getParam(searchParams.pageSize);
+
+	const page = toNumber(rawPage, 1);
+	const pageSize = Math.min(toNumber(rawPageSize, 10), 50);
 
 	const filters: string[] = [];
 	const values: Array<string | number> = [];
 
-	if (term) {
-		values.push(term);
-		filters.push(`term = $${values.length}`);
+	if (rawTerm) {
+		values.push(rawTerm);
+		filters.push(`UPPER(term) = UPPER($${values.length})`);
 	}
 
-	const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+	const where = buildWhereClause(filters, values);
+	const offset = (page - 1) * pageSize;
 
 	const countRes = await query(
 		`SELECT COUNT(*)::int AS total FROM vw_teacher_load ${where}`,
@@ -43,13 +42,8 @@ export default async function TeacherLoadReport({
 	);
 	const data = dataRes.rows;
 
-	const makeLink = (targetPage: number) => {
-		const params = new URLSearchParams();
-		if (term) params.set("term", term);
-		params.set("page", String(targetPage));
-		params.set("pageSize", String(pageSize));
-		return `?${params.toString()}`;
-	};
+	const makeLink = (targetPage: number) =>
+		createPaginationLink({ term: rawTerm }, targetPage, pageSize);
 
 	return (
 		<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -67,7 +61,7 @@ export default async function TeacherLoadReport({
 						<input
 							name="term"
 							placeholder="Periodo (ej. 2024-A)"
-							defaultValue={term}
+							defaultValue={rawTerm}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						/>
 						<input type="hidden" name="pageSize" value={pageSize} />

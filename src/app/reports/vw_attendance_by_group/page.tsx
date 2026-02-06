@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { z } from "zod";
+import { getParam, buildWhereClause } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
 
@@ -10,13 +11,21 @@ const FilterSchema = z.object({
 export default async function AttendanceReport({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | undefined };
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  const parsed = FilterSchema.safeParse(searchParams);
+  const rawTerm = getParam(searchParams.term).trim();
+  const parsed = FilterSchema.safeParse({ term: rawTerm || undefined });
   const term = parsed.success ? parsed.data.term : undefined;
 
-  const where = term ? "WHERE term = $1" : "";
-  const values = term ? [term] : [];
+  const filters: string[] = [];
+  const values: Array<string | number> = [];
+
+  if (term) {
+    values.push(term);
+    filters.push(`UPPER(term) = UPPER($${values.length})`);
+  }
+
+  const where = buildWhereClause(filters, values);
 
   const res = await query(
     `SELECT * FROM vw_attendance_by_group ${where} ORDER BY porcentaje_asistencia ASC`,
@@ -42,7 +51,7 @@ export default async function AttendanceReport({
             <input
               name="term"
               placeholder="Periodo (ej. 2024-A)"
-              defaultValue={term ?? ""}
+              defaultValue={rawTerm}
               className="border border-gray-300 rounded px-3 py-2 text-sm"
             />
             <button

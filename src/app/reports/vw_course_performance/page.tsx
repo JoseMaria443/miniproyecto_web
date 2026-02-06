@@ -1,13 +1,9 @@
 import Link from "next/link";
 import { z } from "zod";
 import { query } from "@/lib/db";
+import { toNumber, getParam, buildWhereClause, createPaginationLink } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
-
-const toNumber = (value: string | undefined, fallback: number) => {
-	const n = Number(value);
-	return Number.isFinite(n) && n > 0 ? n : fallback;
-};
 
 const ProgramWhitelist = [
 	"Ingeniería de Software",
@@ -26,9 +22,20 @@ const FilterSchema = z.object({
 export default async function CoursePerformanceReport({
 	searchParams,
 }: {
-	searchParams: { [key: string]: string | undefined };
+	searchParams: { [key: string]: string | string[] | undefined };
 }) {
-	const parsed = FilterSchema.safeParse(searchParams);
+	const rawTerm = getParam(searchParams.term).trim();
+	const rawProgram = getParam(searchParams.program).trim();
+	const rawPage = getParam(searchParams.page);
+	const rawPageSize = getParam(searchParams.pageSize);
+
+	const parsed = FilterSchema.safeParse({
+		term: rawTerm || undefined,
+		program: rawProgram || undefined,
+		page: rawPage,
+		pageSize: rawPageSize,
+	});
+
 	const term = parsed.success ? parsed.data.term : "";
 	const program = parsed.success ? parsed.data.program ?? "" : "";
 	const page = toNumber(parsed.success ? parsed.data.page : undefined, 1);
@@ -36,7 +43,6 @@ export default async function CoursePerformanceReport({
 		toNumber(parsed.success ? parsed.data.pageSize : undefined, 10),
 		50
 	);
-	const offset = (page - 1) * pageSize;
 
 	if (!term) {
 		return (
@@ -55,12 +61,12 @@ export default async function CoursePerformanceReport({
 							<input
 								name="term"
 								placeholder="Periodo (ej. 2024-A)"
-								defaultValue={term}
+								defaultValue={rawTerm}
 								className="border border-gray-300 rounded px-3 py-2 text-sm"
 							/>
 							<select
 								name="program"
-								defaultValue={program}
+								defaultValue={rawProgram}
 								className="border border-gray-300 rounded px-3 py-2 text-sm"
 							>
 								<option value="">Programa (opcional)</option>
@@ -91,14 +97,15 @@ export default async function CoursePerformanceReport({
 	const values: Array<string | number> = [];
 
 	values.push(term);
-	filters.push(`v.term = $${values.length}`);
+	filters.push(`UPPER(v.term) = UPPER($${values.length})`);
 
 	if (program) {
 		values.push(program);
 		filters.push(`$${values.length} = ANY (v.programas)`);
 	}
 
-	const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+	const where = buildWhereClause(filters, values);
+	const offset = (page - 1) * pageSize;
 
 	const countRes = await query(
 		`SELECT COUNT(*)::int AS total FROM vw_course_performance v ${where}`,
@@ -115,14 +122,8 @@ export default async function CoursePerformanceReport({
 	);
 	const data = dataRes.rows;
 
-	const makeLink = (targetPage: number) => {
-		const params = new URLSearchParams();
-		if (term) params.set("term", term);
-		if (program) params.set("program", program);
-		params.set("page", String(targetPage));
-		params.set("pageSize", String(pageSize));
-		return `?${params.toString()}`;
-	};
+	const makeLink = (targetPage: number) =>
+		createPaginationLink({ term, program }, targetPage, pageSize);
 
 	return (
 		<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -140,12 +141,12 @@ export default async function CoursePerformanceReport({
 						<input
 							name="term"
 							placeholder="Periodo (ej. 2024-A)"
-							defaultValue={term}
+							defaultValue={rawTerm}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						/>
 						<select
 							name="program"
-							defaultValue={program}
+							defaultValue={rawProgram}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						>
 							<option value="">Programa (opcional)</option>
