@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { z } from "zod";
 import { query } from "@/lib/db";
 import { toNumber, getParam, buildWhereClause, createPaginationLink } from "@/lib/reports";
 
@@ -12,48 +11,35 @@ const ProgramWhitelist = [
 	"Historia del Arte",
 ] as const;
 
-const FilterSchema = z.object({
-	term: z.string().optional(),
-	program: z.enum(ProgramWhitelist).optional(),
-	page: z.string().optional(),
-	pageSize: z.string().optional(),
-});
-
 export default async function RankStudentsReport({
 	searchParams,
 }: {
-	searchParams: { [key: string]: string | string[] | undefined };
+	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-	const rawTerm = getParam(searchParams.term).trim();
-	const rawProgram = getParam(searchParams.program).trim();
-	const rawPage = getParam(searchParams.page);
-	const rawPageSize = getParam(searchParams.pageSize);
+	const params = await searchParams;
+	// Extraer parámetros
+	const term = getParam(params.term).trim() || undefined;
+	const program = getParam(params.program).trim() || undefined;
+	const rawPage = getParam(params.page);
+	const rawPageSize = getParam(params.pageSize);
 
-	const parsed = FilterSchema.safeParse({
-		term: rawTerm || undefined,
-		program: rawProgram || undefined,
-		page: rawPage,
-		pageSize: rawPageSize,
-	});
+	// Validar parámetros
+	const validTerm = (term && term.length > 0) ? term : undefined;
+	const validProgram = (program && ProgramWhitelist.includes(program as any)) ? program : undefined;
 
-	const term = parsed.success ? parsed.data.term ?? "" : "";
-	const program = parsed.success ? parsed.data.program ?? "" : "";
-	const page = toNumber(parsed.success ? parsed.data.page : undefined, 1);
-	const pageSize = Math.min(
-		toNumber(parsed.success ? parsed.data.pageSize : undefined, 10),
-		50
-	);
+	const page = toNumber(rawPage, 1);
+	const pageSize = Math.min(toNumber(rawPageSize, 10), 50);
 
 	const filters: string[] = [];
 	const values: Array<string | number> = [];
 
-	if (term) {
-		values.push(term);
-		filters.push(`UPPER(term) = UPPER($${values.length})`);
+	if (validTerm) {
+		values.push(validTerm);
+		filters.push(`term = $${values.length}`);
 	}
 
-	if (program) {
-		values.push(program);
+	if (validProgram) {
+		values.push(validProgram);
 		filters.push(`programa = $${values.length}`);
 	}
 
@@ -68,15 +54,14 @@ export default async function RankStudentsReport({
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
 	const dataRes = await query(
-		`SELECT * FROM vw_rank_students ${where} ORDER BY term DESC, programa ASC, posicion_en_ranking ASC LIMIT $${
-			values.length + 1
+		`SELECT * FROM vw_rank_students ${where} ORDER BY term DESC, programa ASC, posicion_en_ranking ASC LIMIT $${values.length + 1
 		} OFFSET $${values.length + 2}`,
 		[...values, pageSize, offset]
 	);
 	const data = dataRes.rows;
 
 	const makeLink = (targetPage: number) =>
-		createPaginationLink({ term, program }, targetPage, pageSize);
+		createPaginationLink({ term: validTerm || "", program: validProgram || "" }, targetPage, pageSize);
 
 	return (
 		<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -94,12 +79,12 @@ export default async function RankStudentsReport({
 						<input
 							name="term"
 							placeholder="Periodo (ej. 2024-A)"
-							defaultValue={rawTerm}
+							defaultValue={validTerm || ""}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						/>
 						<select
 							name="program"
-							defaultValue={rawProgram}
+							defaultValue={validProgram || ""}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						>
 							<option value="">Programa (opcional)</option>

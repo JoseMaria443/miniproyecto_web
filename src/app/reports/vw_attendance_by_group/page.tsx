@@ -6,52 +6,25 @@ export const dynamic = "force-dynamic";
 export default async function AttendanceReport({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  // Extraer el término de búsqueda de forma simple
-  const term = getParam(searchParams.term).trim() || undefined;
-  
-  // Si hay un término, asegurarse de que sea válido (no vacío)
+  const params = await searchParams;
+  const term = getParam(params.term).trim() || undefined;
   const validTerm = (term && term.length > 0) ? term : undefined;
 
-  // Construir filtros
   const filters: string[] = [];
   const values: Array<string | number> = [];
 
   if (validTerm) {
     values.push(validTerm);
-    filters.push(`term = $${values.length}`); // Usar comparación directa, no UPPER
+    filters.push(`term = $${values.length}`);
   }
 
   const where = buildWhereClause(filters, values);
-
-  // Construir SQL completo
   const sql = `SELECT * FROM vw_attendance_by_group ${where} ORDER BY porcentaje_asistencia ASC`;
-  
-  // DEBUG - registrar lo que se está ejecutando
-  console.log("===== FILTRO DEBUG =====");
-  console.log("searchParams:", searchParams);
-  console.log("term extraído:", term);
-  console.log("validTerm:", validTerm);
-  console.log("filters array:", filters);
-  console.log("values array:", values);
-  console.log("WHERE clause:", where);
-  console.log("SQL final:", sql);
-  console.log("=======================");
 
-  // Ejecutar query con parámetros
   const res = await query(sql, values);
   const data = res.rows;
-
-  console.log(`Query ejecutada. Filas retornadas: ${data.length}`);
-  if (data.length > 0) {
-    console.log("Primero fila (sample):", {
-      grupo_id: data[0].grupo_id,
-      curso_nombre: data[0].curso_nombre,
-      term: data[0].term,
-      porcentaje_asistencia: data[0].porcentaje_asistencia,
-    });
-  }
 
   const criticalGroup = data[0];
 
@@ -96,8 +69,8 @@ export default async function AttendanceReport({
           {data.length === 0 ? (
             <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
               <p className="text-yellow-700 font-bold text-sm">
-                {validTerm 
-                  ? `No hay datos para el período: "${validTerm}". Intenta con 2024-A o 2024-B` 
+                {validTerm
+                  ? `No hay datos para el período: "${validTerm}". Intenta con 2024-A o 2024-B`
                   : "Sin filtro aplicado. Ingresa un período para ver datos (ej: 2024-A)"}
               </p>
             </div>

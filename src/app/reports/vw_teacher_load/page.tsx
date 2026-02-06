@@ -7,19 +7,18 @@ export const dynamic = "force-dynamic";
 export default async function TeacherLoadReport({
 	searchParams,
 }: {
-	searchParams: { [key: string]: string | string[] | undefined };
+	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-	// Extraer parámetros
-	const term = getParam(searchParams.term).trim() || undefined;
+	const params = await searchParams;
+	const term = getParam(params.term).trim() || undefined;
 	const validTerm = (term && term.length > 0) ? term : undefined;
-	
-	const rawPage = getParam(searchParams.page);
-	const rawPageSize = getParam(searchParams.pageSize);
+
+	const rawPage = getParam(params.page);
+	const rawPageSize = getParam(params.pageSize);
 
 	const page = toNumber(rawPage, 1);
 	const pageSize = Math.min(toNumber(rawPageSize, 10), 50);
 
-	// Construir filtros
 	const filters: string[] = [];
 	const values: Array<string | number> = [];
 
@@ -31,7 +30,6 @@ export default async function TeacherLoadReport({
 	const where = buildWhereClause(filters, values);
 	const offset = (page - 1) * pageSize;
 
-	// Query para contar total
 	const countRes = await query(
 		`SELECT COUNT(*)::int AS total FROM vw_teacher_load ${where}`,
 		values
@@ -39,22 +37,12 @@ export default async function TeacherLoadReport({
 	const total = countRes.rows[0]?.total ?? 0;
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-	// Query para obtener datos paginados
 	const dataRes = await query(
-		`SELECT * FROM vw_teacher_load ${where} ORDER BY term DESC, total_grupos DESC LIMIT $${
-			values.length + 1
+		`SELECT * FROM vw_teacher_load ${where} ORDER BY term DESC, total_grupos DESC LIMIT $${values.length + 1
 		} OFFSET $${values.length + 2}`,
 		[...values, pageSize, offset]
 	);
 	const data = dataRes.rows;
-
-	// Debug
-	console.log("===== TEACHER LOAD FILTRO DEBUG =====");
-	console.log("validTerm:", validTerm);
-	console.log("filters:", filters);
-	console.log("values:", values);
-	console.log("Total rows:", total);
-	console.log("======================================");
 
 	const makeLink = (targetPage: number) =>
 		createPaginationLink({ term: validTerm || "" }, targetPage, pageSize);
@@ -75,7 +63,7 @@ export default async function TeacherLoadReport({
 						<input
 							name="term"
 							placeholder="Periodo (ej. 2024-A)"
-							defaultValue={rawTerm}
+							defaultValue={validTerm || ""}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						/>
 						<input type="hidden" name="pageSize" value={pageSize} />
@@ -90,7 +78,7 @@ export default async function TeacherLoadReport({
 					{data.length === 0 ? (
 						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
 							<p className="text-yellow-700 font-bold text-sm">
-								No hay datos para el período {rawTerm && `"${rawTerm}"`}. Intenta con 2024-A o 2024-B
+								No hay datos para el período {validTerm && `"${validTerm}"`}. Intenta con 2024-A o 2024-B
 							</p>
 						</div>
 					) : (

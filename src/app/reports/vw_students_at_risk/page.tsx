@@ -1,52 +1,38 @@
 import Link from "next/link";
-import { z } from "zod";
 import { query } from "@/lib/db";
 import { toNumber, getParam, buildWhereClause, createPaginationLink } from "@/lib/reports";
 
 export const dynamic = "force-dynamic";
 
-const FilterSchema = z.object({
-	term: z.string().optional(),
-	q: z.string().optional(),
-	page: z.string().optional(),
-	pageSize: z.string().optional(),
-});
-
 export default async function StudentsAtRiskReport({
 	searchParams,
 }: {
-	searchParams: { [key: string]: string | string[] | undefined };
+	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-	const rawTerm = getParam(searchParams.term).trim();
-	const rawQuery = getParam(searchParams.q).trim();
-	const rawPage = getParam(searchParams.page);
-	const rawPageSize = getParam(searchParams.pageSize);
+	const params = await searchParams;
+	// Extraer parámetros
+	const term = getParam(params.term).trim() || undefined;
+	const q = getParam(params.q).trim() || undefined;
+	const rawPage = getParam(params.page);
+	const rawPageSize = getParam(params.pageSize);
 
-	const parsed = FilterSchema.safeParse({
-		term: rawTerm || undefined,
-		q: rawQuery || undefined,
-		page: rawPage,
-		pageSize: rawPageSize,
-	});
+	// Validar parámetros
+	const validTerm = (term && term.length > 0) ? term : undefined;
+	const validQuery = (q && q.length > 0) ? q : undefined;
 
-	const term = parsed.success ? parsed.data.term ?? "" : "";
-	const q = parsed.success ? parsed.data.q ?? "" : "";
-	const page = toNumber(parsed.success ? parsed.data.page : undefined, 1);
-	const pageSize = Math.min(
-		toNumber(parsed.success ? parsed.data.pageSize : undefined, 10),
-		50
-	);
+	const page = toNumber(rawPage, 1);
+	const pageSize = Math.min(toNumber(rawPageSize, 10), 50);
 
 	const filters: string[] = [];
 	const values: Array<string | number> = [];
 
-	if (term) {
-		values.push(term);
-		filters.push(`UPPER(term) = UPPER($${values.length})`);
+	if (validTerm) {
+		values.push(validTerm);
+		filters.push(`term = $${values.length}`);
 	}
 
-	if (q) {
-		values.push(`%${q}%`);
+	if (validQuery) {
+		values.push(`%${validQuery}%`);
 		const searchParamIndex = values.length;
 		filters.push(
 			`(estudiante_nombre ILIKE $${searchParamIndex} OR estudiante_correo ILIKE $${searchParamIndex})`
@@ -64,15 +50,14 @@ export default async function StudentsAtRiskReport({
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
 	const dataRes = await query(
-		`SELECT * FROM vw_students_at_risk ${where} ORDER BY term DESC, promedio_acumulado ASC LIMIT $${
-			values.length + 1
+		`SELECT * FROM vw_students_at_risk ${where} ORDER BY term DESC, promedio_acumulado ASC LIMIT $${values.length + 1
 		} OFFSET $${values.length + 2}`,
 		[...values, pageSize, offset]
 	);
 	const data = dataRes.rows;
 
 	const makeLink = (targetPage: number) =>
-		createPaginationLink({ term, q }, targetPage, pageSize);
+		createPaginationLink({ term: validTerm || "", q: validQuery || "" }, targetPage, pageSize);
 
 	return (
 		<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -90,13 +75,13 @@ export default async function StudentsAtRiskReport({
 						<input
 							name="term"
 							placeholder="Periodo (ej. 2024-A)"
-							defaultValue={rawTerm}
+							defaultValue={validTerm || ""}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						/>
 						<input
 							name="q"
 							placeholder="Buscar por nombre o correo"
-							defaultValue={rawQuery}
+							defaultValue={validQuery || ""}
 							className="border border-gray-300 rounded px-3 py-2 text-sm w-64"
 						/>
 						<input type="hidden" name="pageSize" value={pageSize} />
