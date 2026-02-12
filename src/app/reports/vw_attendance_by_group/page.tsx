@@ -1,32 +1,49 @@
-import { query } from "@/lib/db";
-import { getParam, buildWhereClause } from "@/lib/reports";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 
-export default async function AttendanceReport({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
-  const term = getParam(params.term).trim() || undefined;
-  const validTerm = (term && term.length > 0) ? term : undefined;
+export default function AttendanceReport() {
+	const searchParams = useSearchParams();
+	const [data, setData] = useState<any[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
-  const filters: string[] = [];
-  const values: Array<string | number> = [];
+	const term = searchParams.get("term")?.trim() || "";
+	const validTerm = term && term.length > 0 ? term : undefined;
 
-  if (validTerm) {
-    values.push(validTerm);
-    filters.push(`term = $${values.length}`);
-  }
+	const fetchData = useCallback(async () => {
+		try {
+			setLoading(true);
+			setError(null);
+			const params = new URLSearchParams({
+				...(validTerm && { term: validTerm }),
+			});
+			const response = await fetch(`/api/reports/vw_attendance_by_group?${params}`);
+			if (!response.ok) throw new Error("Error al obtener datos");
+			const result = await response.json();
+			setData(result.data);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Error desconocido");
+		} finally {
+			setLoading(false);
+		}
+	}, [validTerm]);
 
-  const where = buildWhereClause(filters, values);
-  const sql = `SELECT * FROM vw_attendance_by_group ${where} ORDER BY porcentaje_asistencia ASC`;
+	useEffect(() => {
+		fetchData();
+	}, [fetchData]);
 
-  const res = await query(sql, values);
-  const data = res.rows;
+	const criticalGroup = data[0];
 
-  const criticalGroup = data[0];
+	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		const formData = new FormData(e.currentTarget);
+		const params = new URLSearchParams();
+		const termValue = formData.get("term");
+		if (termValue) params.set("term", termValue.toString());
+		window.location.href = `?${params.toString()}`;
+	};
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -40,20 +57,33 @@ export default async function AttendanceReport({
       </div>
       <div className="w-full px-6 py-10">
         <div className="max-w-6xl mx-auto bg-white/95 rounded-xl shadow-2xl border border-gray-800/30 p-6">
-          <form className="flex flex-wrap gap-3 mb-6" method="get">
+          <form className="flex flex-wrap gap-3 mb-6" onSubmit={handleSubmit}>
             <input
               name="term"
               placeholder="Periodo (ej. 2024-A)"
-              defaultValue={term || ""}
+              defaultValue={validTerm || ""}
               className="border border-gray-300 rounded px-3 py-2 text-sm"
             />
             <button
               type="submit"
               className="bg-gray-900 text-white px-4 py-2 rounded text-sm"
+              disabled={loading}
             >
-              Filtrar
+              {loading ? "Cargando..." : "Filtrar"}
             </button>
           </form>
+
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+              <p className="text-red-700 font-bold text-sm">{error}</p>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Cargando datos...</p>
+            </div>
+          ) :
 
           {criticalGroup && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">

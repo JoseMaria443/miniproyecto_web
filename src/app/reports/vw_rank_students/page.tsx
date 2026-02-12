@@ -1,8 +1,9 @@
-import Link from "next/link";
-import { query } from "@/lib/db";
-import { toNumber, getParam, buildWhereClause, createPaginationLink } from "@/lib/reports";
+"use client";
 
-export const dynamic = "force-dynamic";
+import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { toNumber, createPaginationLink } from "@/lib/reports";
 
 const ProgramWhitelist = [
 	"Ingeniería de Software",
@@ -11,57 +12,67 @@ const ProgramWhitelist = [
 	"Historia del Arte",
 ] as const;
 
-export default async function RankStudentsReport({
-	searchParams,
-}: {
-	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-	const params = await searchParams;
-	// Extraer parámetros
-	const term = getParam(params.term).trim() || undefined;
-	const program = getParam(params.program).trim() || undefined;
-	const rawPage = getParam(params.page);
-	const rawPageSize = getParam(params.pageSize);
+export default function RankStudentsReport() {
+	const searchParams = useSearchParams();
+	const [data, setData] = useState<any[]>([]);
+	const [total, setTotal] = useState(0);
+	const [totalPages, setTotalPages] = useState(0);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
-	// Validar parámetros
-	const validTerm = (term && term.length > 0) ? term : undefined;
-	const validProgram = (program && ProgramWhitelist.includes(program as any)) ? program : undefined;
+	const term = searchParams.get("term")?.trim() || "";
+	const program = searchParams.get("program")?.trim() || "";
+	const rawPage = searchParams.get("page");
+	const rawPageSize = searchParams.get("pageSize");
 
-	const page = toNumber(rawPage, 1);
-	const pageSize = Math.min(toNumber(rawPageSize, 10), 50);
+	const validTerm = term && term.length > 0 ? term : undefined;
+	const validProgram = program && ProgramWhitelist.includes(program as any) ? program : undefined;
 
-	const filters: string[] = [];
-	const values: Array<string | number> = [];
+	const page = toNumber(rawPage || "", 1);
+	const pageSize = Math.min(toNumber(rawPageSize || "", 10), 50);
 
-	if (validTerm) {
-		values.push(validTerm);
-		filters.push(`term = $${values.length}`);
-	}
+	const fetchData = useCallback(async () => {
+		try {
+			setLoading(true);
+			setError(null);
+			const params = new URLSearchParams({
+				page: String(page),
+				pageSize: String(pageSize),
+				...(validTerm && { term: validTerm }),
+				...(validProgram && { program: validProgram }),
+			});
+			const response = await fetch(`/api/reports/vw_rank_students?${params}`);
+			if (!response.ok) throw new Error("Error al obtener datos");
+			const result = await response.json();
+			setData(result.data);
+			setTotal(result.total);
+			setTotalPages(result.totalPages);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Error desconocido");
+		} finally {
+			setLoading(false);
+		}
+	}, [page, pageSize, validTerm, validProgram]);
 
-	if (validProgram) {
-		values.push(validProgram);
-		filters.push(`programa = $${values.length}`);
-	}
-
-	const where = buildWhereClause(filters, values);
-	const offset = (page - 1) * pageSize;
-
-	const countRes = await query(
-		`SELECT COUNT(*)::int AS total FROM vw_rank_students ${where}`,
-		values
-	);
-	const total = countRes.rows[0]?.total ?? 0;
-	const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-	const dataRes = await query(
-		`SELECT * FROM vw_rank_students ${where} ORDER BY term DESC, programa ASC, posicion_en_ranking ASC LIMIT $${values.length + 1
-		} OFFSET $${values.length + 2}`,
-		[...values, pageSize, offset]
-	);
-	const data = dataRes.rows;
+	useEffect(() => {
+		fetchData();
+	}, [fetchData]);
 
 	const makeLink = (targetPage: number) =>
 		createPaginationLink({ term: validTerm || "", program: validProgram || "" }, targetPage, pageSize);
+
+	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		const formData = new FormData(e.currentTarget);
+		const params = new URLSearchParams();
+		const termValue = formData.get("term");
+		const programValue = formData.get("program");
+		if (termValue) params.set("term", termValue.toString());
+		if (programValue) params.set("program", programValue.toString());
+		params.set("page", "1");
+		params.set("pageSize", String(pageSize));
+		window.location.href = `?${params.toString()}`;
+	};
 
 	return (
 		<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -75,7 +86,7 @@ export default async function RankStudentsReport({
 			</div>
 			<div className="w-full px-6 py-10">
 				<div className="max-w-6xl mx-auto bg-white/95 rounded-xl shadow-2xl border border-gray-800/30 p-6">
-					<form className="flex flex-wrap gap-3 mb-6" method="get">
+					<form className="flex flex-wrap gap-3 mb-6" onSubmit={handleSubmit}>
 						<input
 							name="term"
 							placeholder="Periodo (ej. 2024-A)"
@@ -94,19 +105,30 @@ export default async function RankStudentsReport({
 								</option>
 							))}
 						</select>
-						<input type="hidden" name="pageSize" value={pageSize} />
 						<button
 							type="submit"
 							className="bg-gray-900 text-white px-4 py-2 rounded text-sm"
+							disabled={loading}
 						>
-							Filtrar
+							{loading ? "Cargando..." : "Filtrar"}
 						</button>
 					</form>
 
-					{data.length === 0 ? (
+					{error && (
+						<div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+							<p className="text-red-700 font-bold text-sm">{error}</p>
+						</div>
+					)}
+
+					{loading ? (
+						<div className="text-center py-8">
+							<p className="text-gray-600">Cargando datos...</p>
+						</div>
+					) : data.length === 0 ? (
+
 						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
 							<p className="text-yellow-700 font-bold text-sm">
-								No hay datos {term && `para el período "${term}"`} {program && `en el programa "${program}"`}. Intenta con 2024-A o 2024-B
+								No hay datos {validTerm && `para el período "${validTerm}"`} {validProgram && `en el programa "${validProgram}"`}. Intenta con 2024-A o 2024-B
 							</p>
 						</div>
 					) : (

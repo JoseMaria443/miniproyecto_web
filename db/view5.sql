@@ -11,7 +11,7 @@ WITH StudentCalificaciones AS (
         e.id AS estudiante_id,
         e.nombre AS estudiante_nombre,
         e.correo AS estudiante_correo,
-        e.programa AS programa,
+        e.programa AS programa, 
         g.periodo AS term,
         COALESCE(
             cal.calificacion,

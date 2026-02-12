@@ -1,8 +1,9 @@
-import Link from "next/link";
-import { query } from "@/lib/db";
-import { toNumber, getParam, buildWhereClause, createPaginationLink } from "@/lib/reports";
+"use client";
 
-export const dynamic = "force-dynamic";
+import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { toNumber, createPaginationLink } from "@/lib/reports";
 
 const ProgramWhitelist = [
 	"Ingeniería de Software",
@@ -11,105 +12,70 @@ const ProgramWhitelist = [
 	"Historia del Arte",
 ] as const;
 
-export default async function CoursePerformanceReport({
-	searchParams,
-}: {
-	searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-	const params = await searchParams;
-	// Extraer parámetros
-	const term = getParam(params.term).trim() || undefined;
-	const program = getParam(params.program).trim() || undefined;
-	const rawPage = getParam(params.page);
-	const rawPageSize = getParam(params.pageSize);
+export default function CoursePerformanceReport() {
+	const searchParams = useSearchParams();
+	const [data, setData] = useState<any[]>([]);
+	const [total, setTotal] = useState(0);
+	const [totalPages, setTotalPages] = useState(0);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
-	// Validar que term es obligatorio
-	const validTerm = (term && term.length > 0) ? term : undefined;
-	const validProgram = (program && ProgramWhitelist.includes(program as any)) ? program : undefined;
+	const term = searchParams.get("term")?.trim() || "";
+	const program = searchParams.get("program")?.trim() || "";
+	const rawPage = searchParams.get("page");
+	const rawPageSize = searchParams.get("pageSize");
 
-	const page = toNumber(rawPage, 1);
-	const pageSize = Math.min(toNumber(rawPageSize, 10), 50);
+	const validTerm = term && term.length > 0 ? term : undefined;
+	const validProgram = program && ProgramWhitelist.includes(program as any) ? program : undefined;
 
-	// Si no hay term, mostrar formulario de búsqueda
-	if (!validTerm) {
-		return (
-			<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
-				<div className="bg-gradient-to-r from-gray-900 via-blue-900 to-gray-900 text-white shadow-2xl border-b-4 border-red-600">
-					<div className="max-w-7xl mx-auto px-6 py-8">
-						<h1 className="text-3xl font-bold mb-2">Rendimiento por Curso</h1>
-						<p className="text-gray-300 text-base">
-							Promedios, aprobados y reprobados por curso y periodo.
-						</p>
-					</div>
-				</div>
-				<div className="w-full px-6 py-10">
-					<div className="max-w-3xl mx-auto bg-white/95 rounded-xl shadow-2xl border border-gray-800/30 p-6">
-						<form className="flex flex-wrap gap-3" method="get">
-							<input
-								name="term"
-								placeholder="Periodo (ej. 2024-A)"
-								defaultValue={term || ""}
-								className="border border-gray-300 rounded px-3 py-2 text-sm"
-							/>
-							<select
-								name="program"
-								defaultValue={program || ""}
-								className="border border-gray-300 rounded px-3 py-2 text-sm"
-							>
-								<option value="">Programa (opcional)</option>
-								{ProgramWhitelist.map((item) => (
-									<option key={item} value={item}>
-										{item}
-									</option>
-								))}
-							</select>
-							<input type="hidden" name="pageSize" value={pageSize} />
-							<button
-								type="submit"
-								className="bg-gray-900 text-white px-4 py-2 rounded text-sm"
-							>
-								Filtrar
-							</button>
-						</form>
-						<p className="text-sm text-red-700 mt-4">
-							El periodo es obligatorio para consultar este reporte.
-						</p>
-					</div>
-				</div>
-			</main>
-		);
-	}
+	const page = toNumber(rawPage || "", 1);
+	const pageSize = Math.min(toNumber(rawPageSize || "", 10), 50);
 
-	const filters: string[] = [];
-	const values: Array<string | number> = [];
+	const fetchData = useCallback(async () => {
+		if (!validTerm) return;
+		try {
+			setLoading(true);
+			setError(null);
+			const params = new URLSearchParams({
+				page: String(page),
+				pageSize: String(pageSize),
+				...(validTerm && { term: validTerm }),
+				...(validProgram && { program: validProgram }),
+			});
+			const response = await fetch(`/api/reports/vw_course_performance?${params}`);
+			if (!response.ok) throw new Error("Error al obtener datos");
+			const result = await response.json();
+			setData(result.data);
+			setTotal(result.total);
+			setTotalPages(result.totalPages);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Error desconocido");
+		} finally {
+			setLoading(false);
+		}
+	}, [page, pageSize, validTerm, validProgram]);
 
-	values.push(validTerm);
-	filters.push(`v.term = $${values.length}`);
-
-	if (validProgram) {
-		values.push(validProgram);
-		filters.push(`$${values.length} = ANY (v.programas)`);
-	}
-
-	const where = buildWhereClause(filters, values);
-	const offset = (page - 1) * pageSize;
-
-	const countRes = await query(
-		`SELECT COUNT(*)::int AS total FROM vw_course_performance v ${where}`,
-		values
-	);
-	const total = countRes.rows[0]?.total ?? 0;
-	const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-	const dataRes = await query(
-		`SELECT v.* FROM vw_course_performance v ${where} ORDER BY v.term DESC, v.curso_nombre ASC LIMIT $${values.length + 1
-		} OFFSET $${values.length + 2}`,
-		[...values, pageSize, offset]
-	);
-	const data = dataRes.rows;
+	useEffect(() => {
+		if (validTerm) {
+			fetchData();
+		}
+	}, [fetchData, validTerm]);
 
 	const makeLink = (targetPage: number) =>
 		createPaginationLink({ term: validTerm || "", program: validProgram || "" }, targetPage, pageSize);
+
+	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		const formData = new FormData(e.currentTarget);
+		const params = new URLSearchParams();
+		const termValue = formData.get("term");
+		const programValue = formData.get("program");
+		if (termValue) params.set("term", termValue.toString());
+		if (programValue) params.set("program", programValue.toString());
+		params.set("page", "1");
+		params.set("pageSize", String(pageSize));
+		window.location.href = `?${params.toString()}`;
+	};
 
 	return (
 		<main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950">
@@ -123,16 +89,16 @@ export default async function CoursePerformanceReport({
 			</div>
 			<div className="w-full px-6 py-10">
 				<div className="max-w-6xl mx-auto bg-white/95 rounded-xl shadow-2xl border border-gray-800/30 p-6">
-					<form className="flex flex-wrap gap-3 mb-6" method="get">
+					<form className="flex flex-wrap gap-3 mb-6" onSubmit={handleSubmit}>
 						<input
 							name="term"
 							placeholder="Periodo (ej. 2024-A)"
-							defaultValue={term || ""}
+							defaultValue={validTerm || ""}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						/>
 						<select
 							name="program"
-							defaultValue={program || ""}
+							defaultValue={validProgram || ""}
 							className="border border-gray-300 rounded px-3 py-2 text-sm"
 						>
 							<option value="">Programa (opcional)</option>
@@ -142,19 +108,35 @@ export default async function CoursePerformanceReport({
 								</option>
 							))}
 						</select>
-						<input type="hidden" name="pageSize" value={pageSize} />
 						<button
 							type="submit"
 							className="bg-gray-900 text-white px-4 py-2 rounded text-sm"
+							disabled={loading}
 						>
-							Filtrar
+							{loading ? "Cargando..." : "Filtrar"}
 						</button>
 					</form>
 
-					{data.length === 0 ? (
+					{error && (
+						<div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+							<p className="text-red-700 font-bold text-sm">{error}</p>
+						</div>
+					)}
+
+					{!validTerm && !loading ? (
 						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
 							<p className="text-yellow-700 font-bold text-sm">
-								No hay datos para el período: "{term}" {program && `+ Programa: "${program}"`}. Intenta con 2024-A o 2024-B
+								El periodo es obligatorio para consultar este reporte.
+							</p>
+						</div>
+					) : loading && validTerm ? (
+						<div className="text-center py-8">
+							<p className="text-gray-600">Cargando datos...</p>
+						</div>
+					) : data.length === 0 ? (
+						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+							<p className="text-yellow-700 font-bold text-sm">
+								No hay datos para el período: "{validTerm}" {validProgram && `+ Programa: "${validProgram}"`}. Intenta con 2024-A o 2024-B
 							</p>
 						</div>
 					) : (
