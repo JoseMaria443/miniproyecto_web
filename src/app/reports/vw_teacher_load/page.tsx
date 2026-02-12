@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { toNumber, createPaginationLink } from "@/lib/reports";
 
-export default function TeacherLoadReport() {
+function TeacherLoadContent() {
 	const searchParams = useSearchParams();
 	const [data, setData] = useState<any[]>([]);
 	const [total, setTotal] = useState(0);
@@ -44,6 +44,7 @@ export default function TeacherLoadReport() {
 	}, [page, pageSize, validTerm]);
 
 	useEffect(() => {
+		// Siempre llamar fetchData (con o sin filtro)
 		fetchData();
 	}, [fetchData]);
 
@@ -101,10 +102,10 @@ export default function TeacherLoadReport() {
 						<div className="text-center py-8">
 							<p className="text-gray-600">Cargando datos...</p>
 						</div>
-					) : data.length === 0 ? (
+) : data.length === 0 ? (
 						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
 							<p className="text-yellow-700 font-bold text-sm">
-								No hay datos para el período {validTerm && `"${validTerm}"`}. Intenta con 2024-A o 2024-B
+								No hay datos para el período "{validTerm}". Intenta con 2024-A o 2024-B
 							</p>
 						</div>
 					) : (
@@ -179,5 +180,13 @@ export default function TeacherLoadReport() {
 				</div>
 			</div>
 		</main>
+	);
+}
+
+export default function TeacherLoadReport() {
+	return (
+		<Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+			<TeacherLoadContent />
+		</Suspense>
 	);
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function AttendanceReport() {
+function AttendanceContent() {
 	const searchParams = useSearchParams();
 	const [data, setData] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -31,6 +31,7 @@ export default function AttendanceReport() {
 	}, [validTerm]);
 
 	useEffect(() => {
+		// Siempre llamar fetchData (con o sin filtro)
 		fetchData();
 	}, [fetchData]);
 
@@ -83,31 +84,29 @@ export default function AttendanceReport() {
             <div className="text-center py-8">
               <p className="text-gray-600">Cargando datos...</p>
             </div>
-          ) :
-
-          {criticalGroup && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-              <p className="text-red-700 font-bold text-sm text-uppercase">
-                Grupo Critico (Menor Asistencia)
-              </p>
-              <p className="text-xl font-semibold">
-                {criticalGroup.curso_nombre}: {criticalGroup.porcentaje_asistencia}%
-              </p>
-            </div>
-          )}
-
-          {data.length === 0 ? (
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
-              <p className="text-yellow-700 font-bold text-sm">
-                {validTerm
-                  ? `No hay datos para el período: "${validTerm}". Intenta con 2024-A o 2024-B`
-                  : "Sin filtro aplicado. Ingresa un período para ver datos (ej: 2024-A)"}
-              </p>
-            </div>
           ) : (
-            <div className="bg-white shadow rounded-lg overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <>
+              {criticalGroup && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                  <p className="text-red-700 font-bold text-sm text-uppercase">
+                    Grupo Critico (Menor Asistencia)
+                  </p>
+                  <p className="text-xl font-semibold">
+                    {criticalGroup.curso_nombre}: {criticalGroup.porcentaje_asistencia}%
+                  </p>
+                </div>
+              )}
+
+              {data.length === 0 ? (
+                <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                  <p className="text-yellow-700 font-bold text-sm">
+                    No hay datos disponibles. Intenta con 2024-A o 2024-B
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white shadow rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Curso
@@ -142,10 +141,20 @@ export default function AttendanceReport() {
                   ))}
                 </tbody>
               </table>
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
     </main>
   );
+}
+
+export default function AttendanceReport() {
+	return (
+		<Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+			<AttendanceContent />
+		</Suspense>
+	);
 }

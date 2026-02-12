@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { toNumber, createPaginationLink } from "@/lib/reports";
 
-export default function StudentsAtRiskReport() {
+function StudentsAtRiskContent() {
 	const searchParams = useSearchParams();
 	const [data, setData] = useState<any[]>([]);
 	const [total, setTotal] = useState(0);
@@ -48,6 +48,7 @@ export default function StudentsAtRiskReport() {
 	}, [page, pageSize, validTerm, validQuery]);
 
 	useEffect(() => {
+		// Siempre llamar fetchData (con o sin filtro)
 		fetchData();
 	}, [fetchData]);
 
@@ -107,11 +108,11 @@ export default function StudentsAtRiskReport() {
 						</div>
 					)}
 
-					{loading ? (
+			{loading ? (
 						<div className="text-center py-8">
 							<p className="text-gray-600">Cargando datos...</p>
 						</div>
-					) : data.length === 0 ? (
+		) : data.length === 0 ? (
 						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
 							<p className="text-yellow-700 font-bold text-sm">
 								No hay estudiantes en riesgo {validTerm && `para el período "${validTerm}"`} {validQuery && `que coincidan con "${validQuery}"`}. Intenta con 2024-A o 2024-B
@@ -193,5 +194,13 @@ export default function StudentsAtRiskReport() {
 				</div>
 			</div>
 		</main>
+	);
+}
+
+export default function StudentsAtRiskReport() {
+	return (
+		<Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+			<StudentsAtRiskContent />
+		</Suspense>
 	);
 }

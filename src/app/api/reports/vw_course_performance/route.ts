@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
 		const validTerm = term && term.length > 0 ? term : undefined;
 		const validProgram = program && ProgramWhitelist.includes(program as any) ? program : undefined;
 
-		// Si no hay término, retornar error indicando que es obligatorio
 		if (!validTerm) {
 			return NextResponse.json(
 				{ error: "El periodo es obligatorio" },

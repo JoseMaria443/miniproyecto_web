@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { toNumber, createPaginationLink } from "@/lib/reports";
 
@@ -12,7 +12,7 @@ const ProgramWhitelist = [
 	"Historia del Arte",
 ] as const;
 
-export default function CoursePerformanceReport() {
+function CoursePerformanceContent() {
 	const searchParams = useSearchParams();
 	const [data, setData] = useState<any[]>([]);
 	const [total, setTotal] = useState(0);
@@ -56,10 +56,9 @@ export default function CoursePerformanceReport() {
 	}, [page, pageSize, validTerm, validProgram]);
 
 	useEffect(() => {
-		if (validTerm) {
-			fetchData();
-		}
-	}, [fetchData, validTerm]);
+		// Siempre llamar fetchData (con o sin filtro)
+		fetchData();
+	}, [fetchData]);
 
 	const makeLink = (targetPage: number) =>
 		createPaginationLink({ term: validTerm || "", program: validProgram || "" }, targetPage, pageSize);
@@ -123,13 +122,7 @@ export default function CoursePerformanceReport() {
 						</div>
 					)}
 
-					{!validTerm && !loading ? (
-						<div className="bg-yellow-50 border-l-4 border-yellow-500 p-4">
-							<p className="text-yellow-700 font-bold text-sm">
-								El periodo es obligatorio para consultar este reporte.
-							</p>
-						</div>
-					) : loading && validTerm ? (
+				{loading ? (
 						<div className="text-center py-8">
 							<p className="text-gray-600">Cargando datos...</p>
 						</div>
@@ -211,5 +204,12 @@ export default function CoursePerformanceReport() {
 				</div>
 			</div>
 		</main>
+	);
+}
+export default function CoursePerformanceReport() {
+	return (
+		<Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+			<CoursePerformanceContent />
+		</Suspense>
 	);
 }
